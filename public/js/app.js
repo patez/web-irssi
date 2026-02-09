@@ -1,19 +1,59 @@
+// public/js/app.js
+
 const app = {
     authToken: null,
     username: null,
     isAdmin: false,
     manualDisconnect: false,
+    terminalInitialized: false,
 
     init() {
-        // Initialize terminal
-        TerminalManager.init();
-
-        // Initialize auth UI
+	console.log('App initializing...');
+        
+        // Initialize auth UI first
         AuthUI.init();
 
-        // Check for saved session
-        this.checkSavedSession();
+        // Check if we have an activation token in URL - this takes priority!
+        const urlParams = new URLSearchParams(window.location.search);
+        const activationToken = urlParams.get('token');
+        
+        if (activationToken) {
+            console.log('Activation token found in URL, ignoring saved session');
+            // Clear any saved session cookies to force activation
+            this.deleteCookie('authToken');
+            this.deleteCookie('username');
+            // AuthUI.init() already called checkURLForActivation()
+            return; // Don't check saved session
+        }
 
+        // Check for saved session only if no activation token
+        const hasSavedSession = this.checkSavedSession();
+        
+        // Only initialize terminal if we have a saved session
+        if (hasSavedSession) {
+            console.log('Saved session found, initializing terminal');
+            this.initializeTerminal();
+            this.connect();
+        } else {
+            console.log('No saved session, waiting for login');
+        }
+
+        // Setup event listeners
+        this.setupEventListeners();
+    },
+
+    initializeTerminal() {
+        if (this.terminalInitialized) {
+            console.log('Terminal already initialized');
+            return;
+        }
+        
+        console.log('Initializing terminal...');
+        TerminalManager.init();
+        this.terminalInitialized = true;
+    },
+
+    setupEventListeners() {
         // Handle page visibility changes
         document.addEventListener('visibilitychange', () => {
             if (!document.hidden && TerminalManager.ws && TerminalManager.ws.readyState === WebSocket.OPEN) {
@@ -30,14 +70,20 @@ const app = {
         });
 
         // Admin link click
-        document.getElementById('admin-link').addEventListener('click', () => {
-            AdminUI.show();
-        });
+        const adminLink = document.getElementById('admin-link');
+        if (adminLink) {
+            adminLink.addEventListener('click', () => {
+                AdminUI.show();
+            });
+        }
 
         // Mobile input
-        document.getElementById('mobile-input').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') this.sendMobileInput();
-        });
+        const mobileInput = document.getElementById('mobile-input');
+        if (mobileInput) {
+            mobileInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') this.sendMobileInput();
+            });
+        }
     },
 
     checkSavedSession() {
@@ -45,12 +91,16 @@ const app = {
         const username = this.getCookie('username');
 
         if (token && username) {
+            console.log('Found saved session for:', username);
             this.authToken = token;
             this.username = username;
             this.checkAdminStatus();
             AuthUI.hide();
-            this.connect();
+            return true;
         }
+        
+        console.log('No saved session found');
+        return false;
     },
 
     async checkAdminStatus() {
@@ -64,6 +114,7 @@ const app = {
     },
 
     handleLoginSuccess(data) {
+        console.log('Login successful, initializing terminal');
         this.authToken = data.token;
         this.username = data.username;
         this.isAdmin = data.isAdmin || false;
@@ -73,10 +124,31 @@ const app = {
 
         this.updateAdminUI();
         AuthUI.hide();
+        
+	// If there was a ghost terminal from a previous user, kill it first
+    	if (this.terminalInitialized) {
+        	TerminalManager.disconnect();
+        	this.terminalInitialized = false;
+    	}
+
+        // Initialize terminal on first login
+        this.initializeTerminal();
         this.connect();
     },
 
     connect() {
+        if (!this.terminalInitialized) {
+            console.error('Cannot connect: terminal not initialized');
+            return;
+        }
+
+	// NEW GUARD: If the terminal is already "Connecting" or "Open", don't do it again!
+    	if (TerminalManager.ws && (TerminalManager.ws.readyState === WebSocket.CONNECTING || TerminalManager.ws.readyState === WebSocket.OPEN)) {
+        	console.log('Terminal already connected or connecting, skipping...');
+        	return;
+    	}
+        
+        console.log('Connecting to terminal...');
         this.manualDisconnect = false;
         TerminalManager.connect(this.authToken);
         this.updateUserInfo();
@@ -99,6 +171,7 @@ const app = {
     },
 
     async logout() {
+        console.log('Logging out...');
         this.manualDisconnect = true;
 
         if (this.authToken) {
@@ -109,7 +182,10 @@ const app = {
             }
         }
 
-        TerminalManager.disconnect();
+        if (this.terminalInitialized) {
+            TerminalManager.disconnect();
+	    this.terminalInitialized = false; // Reset the flag!
+        }
         
         this.authToken = null;
         this.username = null;
@@ -140,6 +216,11 @@ const app = {
     },
 
     forceRefresh() {
+        if (!this.terminalInitialized) {
+            console.warn('Terminal not initialized');
+            return;
+        }
+        
         TerminalManager.forceRefresh();
         this.updateStatus('connected', 'Refreshing...');
         setTimeout(() => {
@@ -149,6 +230,8 @@ const app = {
 
     sendMobileInput() {
         const input = document.getElementById('mobile-input');
+        if (!input) return;
+        
         const text = input.value;
         
         if (text && TerminalManager.ws && TerminalManager.ws.readyState === WebSocket.OPEN) {
@@ -164,18 +247,22 @@ const app = {
         const dot = document.getElementById('status-dot');
         const statusText = document.getElementById('status-text');
 
-        dot.className = 'status-dot ' + status;
-        statusText.textContent = text;
+        if (dot) dot.className = 'status-dot ' + status;
+        if (statusText) statusText.textContent = text;
     },
 
     updateUserInfo() {
-        if (this.username) {
-            document.getElementById('user-info').textContent = `(${this.username})`;
+        const userInfo = document.getElementById('user-info');
+        if (this.username && userInfo) {
+            userInfo.textContent = `(${this.username})`;
         }
     },
 
     updateAdminUI() {
-        document.getElementById('admin-link').style.display = this.isAdmin ? 'inline' : 'none';
+        const adminLink = document.getElementById('admin-link');
+        if (adminLink) {
+            adminLink.style.display = this.isAdmin ? 'inline' : 'none';
+        }
     },
 
     showMessage(message, type = 'error') {
@@ -202,13 +289,25 @@ const app = {
     }
 };
 
-// Initialize app when DOM is ready
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => app.init());
-} else {
+// EXPLICITLY ATTACH TO WINDOW IMMEDIATELY
+window.app = app;
+
+const initAll = () => {
+    // Check if we already initialized to prevent double-runs
+    if (window.app_is_running) return;
+    window.app_is_running = true;
+
     app.init();
+};
+
+//  HANDLE DOM LOADING
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initAll);
+} else {
+    initAll();
 }
 
 // Global references for inline onclick handlers
 const authUI = AuthUI;
 const adminUI = AdminUI;
+
