@@ -1,6 +1,7 @@
 import express from 'express';
 import { UserService } from '../services/user.service.js';
 import { authenticate } from '../middleware/auth.js';
+import { userQueries } from '../database/queries.js';
 
 const router = express.Router();
 
@@ -49,14 +50,14 @@ router.post('/activate', (req, res, next) => {
 router.get('/activate/:token', (req, res, next) => {
     try {
         const { token } = req.params;
-        const { userQueries } = await import('../database/queries.js');
         const user = userQueries.findByActivationToken.get(token);
         
         if (!user) {
             return res.status(404).json({ error: 'Invalid activation token' });
         }
         
-        res.json({ 
+        res.json({
+	    token, 
             username: user.username,
             email: user.email 
         });

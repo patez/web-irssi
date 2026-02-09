@@ -3,11 +3,11 @@ const API = {
 
     async request(endpoint, options = {}) {
         const response = await fetch(`${this.baseURL}${endpoint}`, {
+	    ...options,
             headers: {
                 'Content-Type': 'application/json',
                 ...options.headers
             },
-            ...options
         });
 
         const data = await response.json();

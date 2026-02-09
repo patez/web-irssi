@@ -67,6 +67,19 @@ fi
                 username
             };
 
+	    // This only runs ONCE when the pty starts
+            ptyProcess.onData((data) => {
+              session.connections.forEach(clientWs => {
+                if (clientWs.readyState === 1) { // 1 = OPEN
+                    try {
+                        clientWs.send(JSON.stringify({ type: 'output', data }));
+                    } catch (e) {
+                        console.error('Send error:', e);
+                    }
+                }
+              });
+             });
+
             ptyProcess.onExit(() => {
                 this.activeSessions.delete(username);
                 session.connections.forEach(ws => ws.close());
@@ -88,20 +101,7 @@ fi
             session.pty.resize(80, 24);
         }, 100);
 
-        // Broadcast to all connections
-        const dataHandler = (data) => {
-            session.connections.forEach(clientWs => {
-                if (clientWs.readyState === 1) {
-                    try {
-                        clientWs.send(JSON.stringify({ type: 'output', data }));
-                    } catch (e) {
-                        console.error('Error sending data:', e);
-                    }
-                }
-            });
-        };
 
-        session.pty.onData(dataHandler);
 
         ws.on('close', () => {
             session.connections.delete(ws);
