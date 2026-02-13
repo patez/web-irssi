@@ -2,6 +2,8 @@
 
 Complete guide for deploying Web IRSSI to production.
 
+##Outdated just run deploy.sh
+
 ## Table of Contents
 
 1. [Server Requirements](#server-requirements)
