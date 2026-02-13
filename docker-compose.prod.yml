@@ -1,0 +1,90 @@
+# docker-compose.prod.yml (Using existing certs from VPS)
+
+services:
+  web-irssi:
+    build:
+      context: .
+      dockerfile: Dockerfile.alpine
+    image: web-irssi:latest
+    container_name: web-irssi-prod
+    restart: always
+    
+    env_file:
+      - .env.production
+    
+    volumes:
+      - irssi-sessions:/app/irssi-sessions
+      - logs:/app/logs
+      - ./users.db:/app/users.db
+    
+    labels:
+      - "traefik.enable=true"
+      
+      # HTTP (redirect to HTTPS)
+      - "traefik.http.routers.web-irssi-http.rule=Host(`irssi.kosminen.org`)"
+      - "traefik.http.routers.web-irssi-http.entrypoints=web"
+      - "traefik.http.routers.web-irssi-http.middlewares=https-redirect"
+      
+      # HTTPS
+      - "traefik.http.routers.web-irssi.rule=Host(`irssi.kosminen.org`)"
+      - "traefik.http.routers.web-irssi.entrypoints=websecure"
+      - "traefik.http.routers.web-irssi.tls=true"
+      
+      # Service
+      - "traefik.http.services.web-irssi.loadbalancer.server.port=3001"
+      
+      # Middleware
+      - "traefik.http.middlewares.https-redirect.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.https-redirect.redirectscheme.permanent=true"
+    
+    networks:
+      - web-irssi-network
+    
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3001"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+  traefik:
+    image: traefik:v3.0-alpine
+    container_name: traefik-prod
+    restart: always
+    
+    command:
+      - "--api.dashboard=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--providers.file.directory=/etc/traefik/dynamic"
+      - "--providers.file.watch=true"
+      - "--log.level=INFO"
+      - "--accesslog=true"
+    
+    ports:
+      - "80:80"
+      - "443:443"
+    
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      
+      # Mount existing certificates from VPS
+      # EDIT THESE PATHS to match your actual certificate locations:
+      - /etc/ssl/cloudflare/irssi.kosminen.org.pem:/etc/traefik/certs/kosminen.org.pem:ro
+      - /etc/ssl/cloudflare/irssi.kosminen.org.key:/etc/traefik/certs/kosminen.org-key.pem:ro
+      
+      # Mount TLS config (create this in project)
+      - ./traefik-tls.yml:/etc/traefik/dynamic/tls.yml:ro
+    
+    networks:
+      - web-irssi-network
+
+networks:
+  web-irssi-network:
+    driver: bridge
+
+volumes:
+  irssi-sessions:
+  logs:

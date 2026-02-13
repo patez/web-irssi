@@ -1,0 +1,56 @@
+# Dockerfile (Lightweight Alpine - Node 24)
+
+# Stage 1: Build stage
+FROM node:24-alpine AS builder
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install dependencies (including dev dependencies for building native modules)
+RUN apk add --no-cache --virtual .build-deps \
+    python3 \
+    make \
+    g++ \
+    && npm ci --only=production \
+    && apk del .build-deps
+
+# Stage 2: Runtime stage
+FROM node:24-alpine
+
+# Install runtime dependencies only
+RUN apk add --no-cache \
+    irssi \
+    tmux \
+    sqlite \
+    bash \
+    && rm -rf /var/cache/apk/*
+
+# Create non-root user
+RUN adduser -D -h /app -s /bin/bash webircuser
+
+WORKDIR /app
+
+# Copy node_modules from builder
+COPY --from=builder /app/node_modules ./node_modules
+
+# Copy application
+COPY --chown=webircuser:webircuser . .
+
+# Create directories
+RUN mkdir -p irssi-sessions logs && \
+    chown -R webircuser:webircuser /app
+
+# Switch to non-root user
+USER webircuser
+
+# Expose port
+EXPOSE 3001
+
+# Health check (lightweight)
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+    CMD wget -q --spider http://localhost:3001 || exit 1
+
+# Start application
+CMD ["node", "server/index.js"]

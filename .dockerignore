@@ -1,0 +1,36 @@
+# .dockerignore
+
+# Node modules
+node_modules/
+npm-debug.log
+
+# Git
+.git/
+.gitignore
+
+# Environment files
+.env
+.env.*
+
+# Database
+users.db
+users.db-shm
+users.db-wal
+
+# Sessions
+irssi-sessions/
+
+# Logs
+logs/
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+
+# Docker
+docker-compose*.yml

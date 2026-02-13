@@ -40,13 +40,13 @@ const TerminalManager = {
 
         this.fitAddon = new FitAddon.FitAddon();
         this.term.loadAddon(this.fitAddon);
-        
+
         const terminalElement = document.getElementById('terminal');
         if (!terminalElement) {
             console.error('Terminal element not found!');
             return;
         }
-        
+
         this.term.open(terminalElement);
         this.fit();
         this.isInitialized = true;
@@ -95,7 +95,7 @@ const TerminalManager = {
         if (!this.isInitialized || !this.fitAddon) {
             return;
         }
-        
+
         try {
             this.fitAddon.fit();
             if (this.ws && this.ws.readyState === WebSocket.OPEN) {
@@ -110,7 +110,7 @@ const TerminalManager = {
         if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
             return;
         }
-        
+
         try {
             this.ws.send(JSON.stringify({
                 type: 'resize',
@@ -160,7 +160,7 @@ const TerminalManager = {
             this.isConnecting = false;
             this.reconnectAttempts = 0;
             app.updateStatus('connected', 'Connected');
-            
+
             // Send initial resize
             setTimeout(() => {
                 this.sendResize();
@@ -195,16 +195,16 @@ const TerminalManager = {
                 reason: event.reason,
                 wasClean: event.wasClean
             });
-            
+
             this.isConnecting = false;
             app.updateStatus('disconnected', 'Connection closed');
-            
+
             // Only attempt reconnect if:
             // 1. Not a manual disconnect
             // 2. Not at max attempts
             // 3. Have a valid token
-            if (!app.manualDisconnect && 
-                this.reconnectAttempts < this.maxReconnectAttempts && 
+            if (!app.manualDisconnect &&
+                this.reconnectAttempts < this.maxReconnectAttempts &&
                 app.authToken) {
                 this.attemptReconnect();
             } else if (this.reconnectAttempts >= this.maxReconnectAttempts) {
@@ -220,23 +220,23 @@ const TerminalManager = {
         }
 
         console.log('Closing existing WebSocket (state:', this.ws.readyState, ')');
-        
+
         try {
             // Remove event handlers to prevent reconnect loop
             this.ws.onclose = null;
             this.ws.onerror = null;
             this.ws.onmessage = null;
             this.ws.onopen = null;
-            
+
             // Close the connection
-            if (this.ws.readyState === WebSocket.OPEN || 
+            if (this.ws.readyState === WebSocket.OPEN ||
                 this.ws.readyState === WebSocket.CONNECTING) {
                 this.ws.close();
             }
         } catch (e) {
             console.error('Error closing WebSocket:', e);
         }
-        
+
         this.ws = null;
     },
 
@@ -248,16 +248,16 @@ const TerminalManager = {
         }
 
         this.reconnectAttempts++;
-        
+
         // Exponential backoff: 1s, 2s, 4s, 8s, 16s
         const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts - 1), 16000);
 
         console.log(`Scheduling reconnect attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts} in ${delay}ms`);
-        app.updateStatus('connecting', `Reconnecting in ${Math.round(delay/1000)}s (${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
+        app.updateStatus('connecting', `Reconnecting in ${Math.round(delay / 1000)}s (${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
 
         this.reconnectTimer = setTimeout(() => {
             this.reconnectTimer = null;
-            
+
             if (app.authToken && !app.manualDisconnect) {
                 console.log('Executing reconnect attempt', this.reconnectAttempts);
                 this.term.writeln(`\r\n\x1b[1;33m[*] Reconnecting (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})...\x1b[0m\r\n`);
@@ -273,7 +273,7 @@ const TerminalManager = {
             console.log('Cannot send input: WebSocket not open');
             return;
         }
-        
+
         this.ws.send(JSON.stringify({
             type: 'input',
             data: data
@@ -299,19 +299,19 @@ const TerminalManager = {
 
     disconnect() {
         console.log('disconnect() called');
-        
+
         // Clear reconnect timer
         if (this.reconnectTimer) {
             clearTimeout(this.reconnectTimer);
             this.reconnectTimer = null;
         }
-        
+
         // Reset reconnect attempts
         this.reconnectAttempts = 0;
-        
+
         // Close WebSocket
         this.closeExistingConnection();
-        
+
         // Clear terminal
         if (this.term) {
             this.term.clear();
@@ -320,15 +320,15 @@ const TerminalManager = {
 
     dispose() {
         console.log('dispose() called');
-        
+
         this.disconnect();
-        
+
         // Disconnect resize observer
         if (this.resizeObserver) {
             this.resizeObserver.disconnect();
             this.resizeObserver = null;
         }
-        
+
         // Dispose terminal
         if (this.term) {
             try {
@@ -338,7 +338,7 @@ const TerminalManager = {
             }
             this.term = null;
         }
-        
+
         this.isInitialized = false;
     }
 };

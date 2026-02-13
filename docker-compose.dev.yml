@@ -1,0 +1,53 @@
+
+
+# docker-compose.dev.simple.yml (No Traefik - Direct Access)
+
+
+services:
+  web-irssi:
+    build:
+      context: .
+      dockerfile: Dockerfile.alpine
+    container_name: web-irssi-dev
+    
+    environment:
+      - NODE_ENV=development
+      - PORT=3001
+      - BASE_URL=http://localhost:3001
+      - IRC_SERVER=irc.libera.chat
+      - IRC_PORT=6667
+      - ADMIN_PASSWORD=dev123 
+      - TERM=xterm-256color
+      - HOME=/app
+      # Ensure the PATH includes all common Linux binary locations
+      - PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+    # These are still required for pseudo-terminal support
+    
+    stdin_open: true
+    
+    restart: unless-stopped
+
+    ports:
+      - "3001:3001"  # Direct port binding - no Traefik needed
+    
+    volumes:
+      # Source code for hot reload
+      - ./server:/app/server:ro
+      - ./public:/app/public:ro
+      # Persistent data
+      - irssi-sessions:/app/irssi-sessions
+      - logs:/app/logs
+      - ./users.db:/app/users.db
+    
+    command: ["npx", "nodemon", "--watch", "server", "server/index.js"]
+    
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3001"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  irssi-sessions:
+  logs:
