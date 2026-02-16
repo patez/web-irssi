@@ -1,6 +1,24 @@
-# Dockerfile (Debian-based - Best UTF-8 Support)
-# Use this if Alpine locale issues persist
+# Dockerfile (Debian Bookworm - Multi-stage with node-pty)
 
+# Stage 1: Build stage
+FROM node:22-trixie AS builder
+
+WORKDIR /app
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y \
+    python3 \
+    make \
+    g++ \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy package files
+COPY package*.json ./
+
+# Install ALL dependencies (including node-pty)
+RUN npm ci
+
+# Stage 2: Runtime stage
 FROM node:22-trixie-slim
 
 # Install runtime dependencies
@@ -30,11 +48,11 @@ RUN useradd -r -m -s /bin/bash -u 1000 webircuser
 
 WORKDIR /app
 
+# Copy node_modules from builder (including compiled node-pty)
+COPY --from=builder --chown=webircuser:webircuser /app/node_modules ./node_modules
+
 # Copy package files
 COPY --chown=webircuser:webircuser package*.json ./
-
-# Install dependencies
-RUN npm ci --only=production
 
 # Copy application
 COPY --chown=webircuser:webircuser . .
