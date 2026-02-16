@@ -37,7 +37,18 @@ const app = {
         } else {
             console.log('No saved session, waiting for login');
         }
+        // Event listeners (replacing inline onclick)
+        document.getElementById('btn-refresh')?.addEventListener('click', () => this.forceRefresh());
+        document.getElementById('btn-reconnect')?.addEventListener('click', () => this.reconnect());
+        document.getElementById('btn-reset')?.addEventListener('click', () => this.clearSession());
+        document.getElementById('btn-logout')?.addEventListener('click', () => this.logout());
+        document.getElementById('admin-link')?.addEventListener('click', () => AdminUI.show());
+        document.getElementById('btn-mobile-send')?.addEventListener('click', () => this.sendMobileInput());
 
+        document.getElementById('mobile-input')?.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') this.sendMobileInput();
+        });
+    
         // Setup event listeners
         this.setupEventListeners();
     },
@@ -55,17 +66,7 @@ const app = {
 
     setupEventListeners() {
 
-        // Event listeners (replacing inline onclick)
-        document.getElementById('btn-refresh')?.addEventListener('click', () => this.forceRefresh());
-        document.getElementById('btn-reconnect')?.addEventListener('click', () => this.reconnect());
-        document.getElementById('btn-reset')?.addEventListener('click', () => this.clearSession());
-        document.getElementById('btn-logout')?.addEventListener('click', () => this.logout());
-        document.getElementById('admin-link')?.addEventListener('click', () => AdminUI.show());
-        document.getElementById('btn-mobile-send')?.addEventListener('click', () => this.sendMobileInput());
-
-        document.getElementById('mobile-input')?.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') this.sendMobileInput();
-        });
+       
         // Handle page visibility changes
         document.addEventListener('visibilitychange', () => {
             if (!document.hidden && TerminalManager.ws && TerminalManager.ws.readyState === WebSocket.OPEN) {
