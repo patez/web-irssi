@@ -1,7 +1,7 @@
 # Dockerfile (Debian-based - Best UTF-8 Support)
 # Use this if Alpine locale issues persist
 
-FROM node:24-trixie-slim
+FROM node:22-trixie-slim
 
 # Install runtime dependencies
 RUN apt-get update && apt-get install -y \
