@@ -1,3 +1,5 @@
+// public/js/auth.js
+
 const AuthUI = {
     currentMode: 'login', // 'login' or 'activate'
     activationToken: null,
@@ -10,7 +12,7 @@ const AuthUI = {
     checkURLForActivation() {
         const urlParams = new URLSearchParams(window.location.search);
         const token = urlParams.get('token');
-        
+
         if (token) {
             this.showActivation(token);
         }
@@ -18,7 +20,7 @@ const AuthUI = {
 
     render() {
         const formContainer = document.getElementById('auth-form');
-        
+
         if (this.currentMode === 'login') {
             formContainer.innerHTML = `
                 <div class="form-group">
@@ -29,18 +31,20 @@ const AuthUI = {
                     <label>Password</label>
                     <input type="password" id="password" placeholder="Enter password" autocomplete="current-password">
                 </div>
-                <button class="btn btn-primary btn-lg" onclick="authUI.login()">Login</button>
+                <button class="btn btn-primary btn-lg" id="btn-login">Login</button>
                 <div class="message error" id="auth-error"></div>
                 <div class="message success" id="auth-success"></div>
             `;
 
-            // Enter key handlers
+            // Add event listeners after rendering
+            document.getElementById('btn-login').addEventListener('click', () => this.login());
             document.getElementById('password').addEventListener('keypress', (e) => {
                 if (e.key === 'Enter') this.login();
             });
             document.getElementById('username').addEventListener('keypress', (e) => {
                 if (e.key === 'Enter') document.getElementById('password').focus();
             });
+
         } else if (this.currentMode === 'activate') {
             formContainer.innerHTML = `
                 <div style="margin-bottom: 20px; padding: 15px; background: var(--bg-tertiary); border-radius: 4px;">
@@ -56,11 +60,13 @@ const AuthUI = {
                     <label>Confirm Password</label>
                     <input type="password" id="activate-confirm" placeholder="Re-enter password" autocomplete="new-password">
                 </div>
-                <button class="btn btn-primary btn-lg" onclick="authUI.activate()">Activate Account</button>
+                <button class="btn btn-primary btn-lg" id="btn-activate">Activate Account</button>
                 <div class="message error" id="auth-error"></div>
                 <div class="message success" id="auth-success"></div>
             `;
 
+            // Add event listeners after rendering
+            document.getElementById('btn-activate').addEventListener('click', () => this.activate());
             document.getElementById('activate-confirm').addEventListener('keypress', (e) => {
                 if (e.key === 'Enter') this.activate();
             });
@@ -94,7 +100,7 @@ const AuthUI = {
         try {
             const data = await API.login(username, password);
             this.showSuccess('Login successful!');
-            
+
             setTimeout(() => {
                 app.handleLoginSuccess(data);
             }, 500);
@@ -125,7 +131,7 @@ const AuthUI = {
         try {
             const data = await API.activate(this.activationToken, password);
             this.showSuccess('Account activated! You can now login.');
-            
+
             setTimeout(() => {
                 this.currentMode = 'login';
                 document.getElementById('auth-title').textContent = 'Login';

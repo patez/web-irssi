@@ -1,3 +1,5 @@
+// public/js/admin.js
+
 const AdminUI = {
     isOpen: false,
 
@@ -20,7 +22,7 @@ const AdminUI = {
             <div class="admin-container">
                 <div class="admin-header">
                     <h2>Admin Panel</h2>
-                    <button class="btn btn-danger" onclick="adminUI.hide()">Close</button>
+                    <button class="btn btn-danger" id="btn-admin-close">Close</button>
                 </div>
 
                 <div class="admin-section">
@@ -46,14 +48,14 @@ const AdminUI = {
                     <div class="settings-row">
                         <label>Maximum Users</label>
                         <input type="number" id="max-users-input" min="1" max="1000" value="10">
-                        <button class="btn btn-primary" onclick="adminUI.saveSettings()">Save</button>
+                        <button class="btn btn-primary" id="btn-save-settings">Save</button>
                     </div>
                 </div>
 
                 <div class="admin-section">
                     <h3>Users</h3>
                     <div style="margin-bottom: 15px;">
-                        <button class="btn btn-primary" onclick="adminUI.toggleCreateForm()">+ Create New User</button>
+                        <button class="btn btn-primary" id="btn-create-user">+ Create New User</button>
                     </div>
 
                     <div id="create-user-form" style="display: none; background: var(--bg-tertiary); padding: 20px; border-radius: 4px; margin-bottom: 15px;">
@@ -71,8 +73,8 @@ const AdminUI = {
                             <label for="new-is-admin">Make this user an admin</label>
                         </div>
                         <div class="form-inline">
-                            <button class="btn btn-primary" onclick="adminUI.createUser()">Create & Send Email</button>
-                            <button class="btn" onclick="adminUI.toggleCreateForm()">Cancel</button>
+                            <button class="btn btn-primary" id="btn-submit-create-user">Create & Send Email</button>
+                            <button class="btn" id="btn-cancel-create-user">Cancel</button>
                         </div>
                     </div>
 
@@ -97,7 +99,15 @@ const AdminUI = {
                 </div>
             </div>
         `;
+
         panel.classList.add('show');
+
+        // Add event listeners after rendering
+        document.getElementById('btn-admin-close').addEventListener('click', () => this.hide());
+        document.getElementById('btn-save-settings').addEventListener('click', () => this.saveSettings());
+        document.getElementById('btn-create-user').addEventListener('click', () => this.toggleCreateForm());
+        document.getElementById('btn-submit-create-user').addEventListener('click', () => this.createUser());
+        document.getElementById('btn-cancel-create-user').addEventListener('click', () => this.toggleCreateForm());
     },
 
     async loadData() {
@@ -119,7 +129,7 @@ const AdminUI = {
 
     renderUsers(users) {
         const tbody = document.getElementById('users-list');
-        
+
         if (users.length === 0) {
             tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--text-tertiary);">No users</td></tr>';
             return;
@@ -135,19 +145,36 @@ const AdminUI = {
                 <td>${user.is_admin ? '✓' : ''}</td>
                 <td>
                     <div class="actions-cell">
-                        <button class="btn" onclick="adminUI.resetPassword(${user.id}, '${user.username}')">Reset</button>
-                        <button class="btn btn-danger" onclick="adminUI.deleteUser(${user.id}, '${user.username}')">Delete</button>
+                        <button class="btn btn-reset-password" data-user-id="${user.id}" data-username="${user.username}">Reset</button>
+                        <button class="btn btn-danger btn-delete-user" data-user-id="${user.id}" data-username="${user.username}">Delete</button>
                     </div>
                 </td>
             </tr>
         `).join('');
+
+        // Add event listeners to action buttons
+        document.querySelectorAll('.btn-reset-password').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const userId = e.target.dataset.userId;
+                const username = e.target.dataset.username;
+                this.resetPassword(userId, username);
+            });
+        });
+
+        document.querySelectorAll('.btn-delete-user').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const userId = e.target.dataset.userId;
+                const username = e.target.dataset.username;
+                this.deleteUser(userId, username);
+            });
+        });
     },
 
     toggleCreateForm() {
         const form = document.getElementById('create-user-form');
         const isVisible = form.style.display !== 'none';
         form.style.display = isVisible ? 'none' : 'block';
-        
+
         if (!isVisible) {
             document.getElementById('new-username').value = '';
             document.getElementById('new-email').value = '';
@@ -170,7 +197,7 @@ const AdminUI = {
             app.showMessage('User created! Activation email sent.', 'success');
             this.toggleCreateForm();
             await this.loadData();
-            
+
             if (data.activationLink) {
                 console.log('Activation link:', data.activationLink);
             }
@@ -195,7 +222,7 @@ const AdminUI = {
 
     async resetPassword(userId, username) {
         const newPassword = prompt(`Enter new password for "${username}" (min 6 characters):`);
-        
+
         if (!newPassword || newPassword.length < 6) {
             app.showMessage('Password must be at least 6 characters', 'error');
             return;
