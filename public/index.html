@@ -29,8 +29,8 @@
 
     <!-- Mobile Keyboard -->
     <div id="mobile-keyboard">
-        <input type="text" id="mobile-input" placeholder="Type here..." autocomplete="off" autocapitalize="none" spellcheck="false">
-        <button class="btn btn-primary" onclick="app.sendMobileInput()">Send</button>
+        <input type="text" id="mobile-input" placeholder="Type here..." autocomplete="off">
+        <button class="btn btn-primary" id="btn-mobile-send">Send</button>
     </div>
 
     <!-- Status Bar -->
@@ -42,10 +42,10 @@
             <span id="admin-link" style="display: none;">Admin</span>
         </div>
         <div id="actions">
-            <button class="btn" onclick="app.forceRefresh()" title="Refresh">⟳</button>
-            <button class="btn" onclick="app.reconnect()" title="Reconnect">↻</button>
-            <button class="btn" onclick="app.clearSession()" title="Reset">Reset</button>
-            <button class="btn" onclick="app.logout()" title="Logout">Exit</button>
+            <button class="btn" id="btn-refresh" title="Refresh">⟳</button>
+            <button class="btn" id="btn-reconnect" title="Reconnect">↻</button>
+            <button class="btn" id="btn-reset" title="Reset">Reset</button>
+            <button class="btn" id="btn-logout" title="Logout">Exit</button>
         </div>
     </div>
 

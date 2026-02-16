@@ -38,40 +38,6 @@ Complete guide for deploying Web IRSSI to production.
 - nginx (for reverse proxy)
 - certbot (for SSL)
 
-## Initial Setup
-
-### 1. Update System
-
-```bash
-sudo apt update && sudo apt upgrade -y
-```
-
-### 2. Install System Dependencies
-
-```bash
-sudo apt install -y tmux irssi nginx certbot python3-certbot-nginx \
-    build-essential python3 git curl
-```
-
-### 3. Install Node.js 20
-
-```bash
-curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-sudo apt install -y nodejs
-```
-
-Verify:
-```bash
-node -v  # Should be v20.x.x
-npm -v   # Should be 10.x.x
-```
-
-### 4. Create Application User
-
-```bash
-sudo useradd -m -s /bin/bash web-irssi
-sudo usermod -aG sudo web-irssi  # Optional: for admin tasks
-```
 
 ### 5. Clone Repository
 
@@ -80,13 +46,6 @@ sudo su - web-irssi
 cd ~
 git clone <your-repo-url> web-irssi
 cd web-irssi
-```
-
-### 6. Run Installation Script
-
-```bash
-chmod +x install.sh
-./install.sh
 ```
 
 ### 7. Configure Environment
@@ -110,206 +69,7 @@ EMAIL_PASS=your-app-password
 EMAIL_FROM=noreply@yourdomain.com
 ```
 
-## PM2 Deployment
 
-### 1. Install PM2 Globally
-
-```bash
-sudo npm install -g pm2
-```
-
-### 2. Start Application
-
-```bash
-cd ~/web-irssi
-pm2 start server/index.js --name web-irssi
-```
-
-### 3. Configure Startup
-
-```bash
-pm2 startup systemd -u web-irssi --hp /home/web-irssi
-```
-
-Copy and run the output command (as root).
-
-### 4. Save PM2 Configuration
-
-```bash
-pm2 save
-```
-
-### 5. Verify Running
-
-```bash
-pm2 status
-pm2 logs web-irssi
-```
-
-### 6. PM2 Ecosystem File (Optional)
-
-Create `ecosystem.config.js`:
-
-```javascript
-module.exports = {
-  apps: [{
-    name: 'web-irssi',
-    script: './server/index.js',
-    instances: 1,
-    autorestart: true,
-    watch: false,
-    max_memory_restart: '500M',
-    env: {
-      NODE_ENV: 'production'
-    },
-    error_file: './logs/err.log',
-    out_file: './logs/out.log',
-    log_date_format: 'YYYY-MM-DD HH:mm:ss Z'
-  }]
-};
-```
-
-Use it:
-```bash
-pm2 start ecosystem.config.js
-pm2 save
-```
-
-## Nginx Configuration
-
-### 1. Create Nginx Config
-
-```bash
-sudo nano /etc/nginx/sites-available/web-irssi
-```
-
-Add:
-```nginx
-# HTTP to HTTPS redirect
-server {
-    listen 80;
-    server_name irc.yourdomain.com;
-    return 301 https://$server_name$request_uri;
-}
-
-# HTTPS server
-server {
-    listen 443 ssl http2;
-    server_name irc.yourdomain.com;
-
-    # SSL certificates (will be added by certbot)
-    # ssl_certificate /etc/letsencrypt/live/irc.yourdomain.com/fullchain.pem;
-    # ssl_certificate_key /etc/letsencrypt/live/irc.yourdomain.com/privkey.pem;
-
-    # Security headers
-    add_header X-Frame-Options "SAMEORIGIN" always;
-    add_header X-Content-Type-Options "nosniff" always;
-    add_header X-XSS-Protection "1; mode=block" always;
-    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-
-    # Gzip compression
-    gzip on;
-    gzip_vary on;
-    gzip_types text/plain text/css application/json application/javascript text/xml application/xml;
-
-    # Proxy settings
-    location / {
-        proxy_pass http://localhost:3001;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_cache_bypass $http_upgrade;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-
-    # WebSocket endpoint
-    location /terminal {
-        proxy_pass http://localhost:3001/terminal;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_read_timeout 86400;
-        proxy_send_timeout 86400;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-
-    # Static files caching
-    location ~* \.(css|js|jpg|jpeg|png|gif|ico|svg|woff|woff2|ttf|eot)$ {
-        proxy_pass http://localhost:3001;
-        expires 1y;
-        add_header Cache-Control "public, immutable";
-    }
-}
-```
-
-### 2. Enable Site
-
-```bash
-sudo ln -s /etc/nginx/sites-available/web-irssi /etc/nginx/sites-enabled/
-sudo nginx -t
-sudo systemctl reload nginx
-```
-
-### 3. Open Firewall (if using UFW)
-
-```bash
-sudo ufw allow 'Nginx Full'
-sudo ufw status
-```
-
-## SSL Setup
-
-### 1. Obtain Certificate
-
-```bash
-sudo certbot --nginx -d irc.yourdomain.com
-```
-
-Follow prompts:
-- Enter email
-- Agree to ToS
-- Choose to redirect HTTP to HTTPS
-
-### 2. Test Auto-Renewal
-
-```bash
-sudo certbot renew --dry-run
-```
-
-### 3. Verify SSL
-
-Visit: https://www.ssllabs.com/ssltest/analyze.html?d=irc.yourdomain.com
-
-## Firewall Configuration
-
-### Using UFW (Ubuntu)
-
-```bash
-# Enable firewall
-sudo ufw enable
-
-# Allow SSH (important!)
-sudo ufw allow ssh
-
-# Allow HTTP/HTTPS
-sudo ufw allow 'Nginx Full'
-
-# Check status
-sudo ufw status verbose
-```
-
-### Using firewalld (CentOS/RHEL)
-
-```bash
-sudo firewall-cmd --permanent --add-service=http
-sudo firewall-cmd --permanent --add-service=https
-sudo firewall-cmd --reload
-```
 
 ## Creating Admin User
 
@@ -347,49 +107,7 @@ curl -X POST https://irc.yourdomain.com/api/admin/users \
 
 ## Monitoring & Logs
 
-### PM2 Monitoring
-
-```bash
-# View status
-pm2 status
-
-# View logs
-pm2 logs web-irssi
-
-# Monitor in real-time
-pm2 monit
-
-# View detailed info
-pm2 info web-irssi
-```
-
-### Application Logs
-
-```bash
-# Via PM2
-pm2 logs web-irssi --lines 100
-
-# Via journalctl (if using systemd)
-sudo journalctl -u web-irssi -f
-```
-
-### Nginx Logs
-
-```bash
-# Access logs
-sudo tail -f /var/log/nginx/access.log
-
-# Error logs
-sudo tail -f /var/log/nginx/error.log
-```
-
-### PM2 Web Dashboard
-
-```bash
-pm2 install pm2-server-monit
-```
-
-Access: `http://your-server-ip:9615`
+#
 
 ## Backup & Recovery
 
@@ -449,63 +167,14 @@ pm2 start web-irssi
 
 ## Troubleshooting
 
-### Server Won't Start
-
-```bash
-# Check Node.js
-node -v
-
-# Check dependencies
-cd ~/web-irssi
-npm install
-
-# Check logs
-pm2 logs web-irssi --err
-
-# Try starting manually
-node server/index.js
-```
-
-### WebSocket Connection Fails
-
-1. Check Nginx config:
-```bash
-sudo nginx -t
-sudo systemctl status nginx
-```
-
-2. Check WebSocket proxy:
-```bash
-curl -i -N -H "Connection: Upgrade" \
-     -H "Upgrade: websocket" \
-     http://localhost:3001/terminal
-```
+#
 
 3. Check firewall:
 ```bash
 sudo ufw status
 ```
 
-### Database Locked
-
-```bash
-cd ~/web-irssi
-pm2 stop web-irssi
-rm users.db-shm users.db-wal
-pm2 start web-irssi
-```
-
-### High Memory Usage
-
-```bash
-# Restart PM2
-pm2 restart web-irssi
-
-# Check processes
-pm2 monit
-
-# Limit memory in ecosystem.config.js
-max_memory_restart: '500M'
+#
 ```
 
 ### Email Not Sending
@@ -565,16 +234,6 @@ pm2 start server/index.js --name web-irssi --max-memory-restart 1G
 pm2 save
 ```
 
-2. Optimize Nginx:
-```nginx
-worker_processes auto;
-worker_rlimit_nofile 65535;
-
-events {
-    worker_connections 4096;
-    use epoll;
-}
-```
 
 3. Increase system limits:
 ```bash

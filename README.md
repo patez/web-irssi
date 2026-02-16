@@ -14,23 +14,6 @@ A secure, multi-user web terminal for IRSSI with persistent sessions, user manag
 
 ## Prerequisites
 
-- Node.js 18+ 
-- tmux
-- irssi
-- A Linux/Unix server (tested on Ubuntu 24)
-
-## Quick Start
-
-### 1. Install System Dependencies
-
-```bash
-# Ubuntu/Debian
-sudo apt update
-sudo apt install tmux irssi build-essential python3
-
-# CentOS/RHEL
-sudo yum install tmux irssi gcc-c++ make python3
-```
 
 ### 2. Clone and Install
 
@@ -63,114 +46,6 @@ EMAIL_PASS=your-app-password
 EMAIL_FROM=noreply@yourdomain.com
 ```
 
-### 4. Start the Server
-
-```bash
-# Development
-npm run dev
-
-# Production
-npm start
-```
-
-The server will start on `http://localhost:3001`
-
-## Production Deployment
-
-### Using PM2 (Recommended)
-
-```bash
-# Install PM2 globally
-npm install -g pm2
-
-# Start the application
-pm2 start server/index.js --name web-irssi
-
-# Enable startup on boot
-pm2 startup
-pm2 save
-
-# Monitor logs
-pm2 logs web-irssi
-
-# Restart
-pm2 restart web-irssi
-```
-
-### Using systemd
-
-Create `/etc/systemd/system/web-irssi.service`:
-
-```ini
-[Unit]
-Description=Web IRSSI
-After=network.target
-
-[Service]
-Type=simple
-User=www-data
-WorkingDirectory=/path/to/web-irssi
-Environment=NODE_ENV=production
-ExecStart=/usr/bin/node server/index.js
-Restart=always
-RestartSec=10
-
-[Install]
-WantedBy=multi-user.target
-```
-
-Enable and start:
-
-```bash
-sudo systemctl enable web-irssi
-sudo systemctl start web-irssi
-sudo systemctl status web-irssi
-```
-
-### Nginx Reverse Proxy
-
-Create `/etc/nginx/sites-available/web-irssi`:
-
-```nginx
-server {
-    listen 80;
-    server_name your-domain.com;
-
-    location / {
-        proxy_pass http://localhost:3001;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_cache_bypass $http_upgrade;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    }
-
-    location /terminal {
-        proxy_pass http://localhost:3001/terminal;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_read_timeout 86400;
-    }
-}
-```
-
-Enable and reload:
-
-```bash
-sudo ln -s /etc/nginx/sites-available/web-irssi /etc/nginx/sites-enabled/
-sudo nginx -t
-sudo systemctl reload nginx
-```
-
-### SSL with Let's Encrypt
-
-```bash
-sudo apt install certbot python3-certbot-nginx
-sudo certbot --nginx -d your-domain.com
-```
 
 ## Initial Admin Setup
 

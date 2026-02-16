@@ -7,7 +7,7 @@ services:
   web-irssi:
     build:
       context: .
-      dockerfile: Dockerfile.alpine
+      dockerfile: Dockerfile
     container_name: web-irssi-dev
     
     environment:
