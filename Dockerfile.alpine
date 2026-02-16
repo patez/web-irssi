@@ -1,4 +1,4 @@
-# Dockerfile.alpine (With UTF-8 Support for ä, ö, å)
+# Dockerfile.alpine (Fixed UID + UTF-8 Support)
 
 # Stage 1: Build stage
 FROM node:24-alpine AS builder
@@ -35,10 +35,11 @@ ENV LANG=en_US.UTF-8 \
     LC_ALL=en_US.UTF-8 \
     LANGUAGE=en_US:en
 
-# Remove git user if exists
+# Remove conflicting users
+RUN deluser --remove-home node 2>/dev/null || true
 RUN deluser git 2>/dev/null || true
 
-# Create non-root user
+# Create non-root user with UID 1000 (now available)
 RUN adduser -D -u 1000 -h /app -s /bin/bash webircuser
 
 WORKDIR /app
