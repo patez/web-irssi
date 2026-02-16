@@ -21,6 +21,10 @@ ENV LANG=en_US.UTF-8 \
     LC_ALL=en_US.UTF-8 \
     LANGUAGE=en_US:en
 
+# Remove conflicting users
+RUN deluser --remove-home node 2>/dev/null || true
+RUN deluser git 2>/dev/null || true
+
 # Create non-root user
 RUN useradd -r -m -s /bin/bash -u 1000 webircuser
 
