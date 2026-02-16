@@ -1,4 +1,4 @@
-# Dockerfile.alpine (Fixed UID + UTF-8 Support)
+# Dockerfile.alpine (Complete UTF-8 + Transliteration Support)
 
 # Stage 1: Build stage
 FROM node:24-alpine AS builder
@@ -19,7 +19,7 @@ RUN apk add --no-cache --virtual .build-deps \
 # Stage 2: Runtime stage
 FROM node:24-alpine
 
-# Install runtime dependencies + locale support
+# Install runtime dependencies + full locale/charset support
 RUN apk add --no-cache \
     irssi \
     tmux \
@@ -28,18 +28,22 @@ RUN apk add --no-cache \
     shadow \
     musl-locales \
     musl-locales-lang \
+    glib \
+    icu-libs \
+    icu-data-full \
     && rm -rf /var/cache/apk/*
 
 # Set UTF-8 locale environment variables
 ENV LANG=en_US.UTF-8 \
     LC_ALL=en_US.UTF-8 \
+    LC_CTYPE=en_US.UTF-8 \
     LANGUAGE=en_US:en
 
 # Remove conflicting users
 RUN deluser --remove-home node 2>/dev/null || true
 RUN deluser git 2>/dev/null || true
 
-# Create non-root user with UID 1000 (now available)
+# Create non-root user
 RUN adduser -D -u 1000 -h /app -s /bin/bash webircuser
 
 WORKDIR /app
@@ -50,7 +54,7 @@ COPY --from=builder --chown=webircuser:webircuser /app/node_modules ./node_modul
 # Copy application
 COPY --chown=webircuser:webircuser . .
 
-# Create directories
+# Create directories with correct ownership
 RUN mkdir -p irssi-sessions logs && \
     chown -R webircuser:webircuser /app
 

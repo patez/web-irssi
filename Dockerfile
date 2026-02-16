@@ -1,38 +1,53 @@
-# Stage 1: Build stage
-FROM node:24-bookworm-slim AS builder
+# Dockerfile (Debian-based - Best UTF-8 Support)
+# Use this if Alpine locale issues persist
 
-WORKDIR /app
-COPY package*.json ./
-
-# Install build tools for native modules
-RUN apt-get update && apt-get install -y \
-    python3 \
-    make \
-    g++ \
-    && npm ci --only=production
-
-# Stage 2: Runtime stage
-FROM node:24-bookworm-slim
+FROM node:24-trixie-slim
 
 # Install runtime dependencies
 RUN apt-get update && apt-get install -y \
     irssi \
     tmux \
     sqlite3 \
-    bash \
+    wget \
+    locales \
     && rm -rf /var/lib/apt/lists/*
 
-# Create user (Debian uses useradd)
-RUN useradd -m -s /bin/bash webircuser
+# Generate UTF-8 locale
+RUN sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen && \
+    locale-gen en_US.UTF-8
+
+# Set locale environment
+ENV LANG=en_US.UTF-8 \
+    LC_ALL=en_US.UTF-8 \
+    LANGUAGE=en_US:en
+
+# Create non-root user
+RUN useradd -r -m -s /bin/bash -u 1000 webircuser
 
 WORKDIR /app
-COPY --from=builder /app/node_modules ./node_modules
+
+# Copy package files
+COPY --chown=webircuser:webircuser package*.json ./
+
+# Install dependencies
+RUN npm ci --only=production
+
+# Copy application
 COPY --chown=webircuser:webircuser . .
 
+# Create directories
 RUN mkdir -p irssi-sessions logs && \
     chown -R webircuser:webircuser /app
 
+# Switch to non-root user
 USER webircuser
+
+# Expose port
 EXPOSE 3001
 
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+    CMD wget -q --spider http://localhost:3001 || exit 1
+
+# Start application
 CMD ["node", "server/index.js"]

@@ -4,7 +4,7 @@ services:
   web-irssi:
     build:
       context: .
-      dockerfile: Dockerfile.alpine
+      dockerfile: Dockerfile
     image: web-irssi:latest
     container_name: web-irssi-prod
     restart: always
@@ -78,6 +78,7 @@ services:
       # Mount TLS config (create this in project)
       - ./traefik-tls.yml:/etc/traefik/dynamic/tls.yml:ro
     
+
     networks:
       - web-irssi-network
 
