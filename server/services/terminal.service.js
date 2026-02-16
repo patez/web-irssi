@@ -26,41 +26,61 @@ class TerminalService {
         return userDir;
     }
 
-    createStartupScript(userDir, username) {
-        // Ensure user directory exists first
-        if (!fs.existsSync(userDir)) {
-            fs.mkdirSync(userDir, { recursive: true });
-        }
+// server/services/terminal.service.js - createStartupScript method
 
-        const startupScript = path.join(userDir, 'startup.sh');
-        const tmuxConf = path.join(userDir, '.tmux.conf');
-        const tmuxSocket = path.join(userDir, '.tmux-socket');
-        const logFile = path.join(userDir, 'session.log');
+createStartupScript(userDir, username) {
+    const startupScript = path.join(userDir, 'startup.sh');
+    const tmuxConf = path.join(userDir, '.tmux.conf');
+    const tmuxSocket = path.join(userDir, '.tmux-socket');
+    const irssiConfig = path.join(userDir, 'config');
+    const logFile = path.join(userDir, 'session.log');
 
-        // Create tmux config
-        fs.writeFileSync(tmuxConf, `
-set -g aggressive-resize on
-set -g history-limit 50000
-set -g focus-events on
+    // Ensure directory exists
+    if (!fs.existsSync(userDir)) {
+        fs.mkdirSync(userDir, { recursive: true });
+    }
+
+    // Create tmux config
+    fs.writeFileSync(tmuxConf, `
 set -g default-terminal "screen-256color"
-        `.trim());
+set -g history-limit 50000
+set -g aggressive-resize on
+set -g focus-events on
+    `.trim());
 
-        console.log(`Created tmux config: ${tmuxConf}`);
+    console.log(`Created tmux config: ${tmuxConf}`);
 
-        // Create startup script with ABSOLUTE PATHS (critical for Docker)
-        fs.writeFileSync(startupScript, `#!/bin/bash
+    // Create irssi config with UTF-8 support
+    fs.writeFileSync(irssiConfig, `
+settings = {
+  core = {
+    real_name = "${username}";
+    user_name = "${username}";
+    nick = "${username}";
+  };
+  "fe-text" = { 
+    term_charset = "UTF-8";
+  };
+  "fe-common/core" = {
+    term_charset = "UTF-8";
+    autolog = "no";
+  };
+};
+    `.trim());
 
-# Explicit PATH for Docker environment
-export PATH=/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/sbin:/sbin
-export HOME="${userDir}"
-export USER="${username}"
-export TERM="xterm-256color"
-export SHELL="/bin/bash"
+    console.log(`Created irssi config: ${irssiConfig}`);
 
-# Trap signals
-trap '' SIGINT SIGTERM SIGQUIT
+    // Create startup script
+    fs.writeFileSync(startupScript, `#!/bin/bash
 
-# Configuration with absolute paths
+# Force UTF-8 everywhere
+export LANG=en_US.UTF-8
+export LC_ALL=en_US.UTF-8
+export LC_CTYPE=en_US.UTF-8
+export LANGUAGE=en_US:en
+export TERM=xterm-256color
+
+# Paths
 TMUX_SESSION="${username}-irssi"
 TMUX_CONF="${tmuxConf}"
 TMUX_SOCKET="${tmuxSocket}"
@@ -68,79 +88,34 @@ TMUX_BIN="/usr/bin/tmux"
 IRSSI_BIN="/usr/bin/irssi"
 LOG_FILE="${logFile}"
 
-# Logging function
 log_msg() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" >> "$LOG_FILE"
 }
 
-log_msg "Starting session for ${username}"
-log_msg "PATH: $PATH"
-log_msg "TMUX_BIN: $TMUX_BIN"
-log_msg "IRSSI_BIN: $IRSSI_BIN"
+log_msg "Starting session with UTF-8: LANG=$LANG"
 
-# Verify binaries exist
-if [ ! -x "$TMUX_BIN" ]; then
-    log_msg "ERROR: tmux not found at $TMUX_BIN"
-    # Try alternative locations
-    if [ -x "/usr/local/bin/tmux" ]; then
-        TMUX_BIN="/usr/local/bin/tmux"
-        log_msg "Found tmux at $TMUX_BIN"
-    else
-        echo "ERROR: tmux not found" >&2
-        exit 1
-    fi
-fi
-
-if [ ! -x "$IRSSI_BIN" ]; then
-    log_msg "ERROR: irssi not found at $IRSSI_BIN"
-    # Try alternative locations
-    if [ -x "/usr/local/bin/irssi" ]; then
-        IRSSI_BIN="/usr/local/bin/irssi"
-        log_msg "Found irssi at $IRSSI_BIN"
-    else
-        echo "ERROR: irssi not found" >&2
-        exit 1
-    fi
-fi
-
-log_msg "Binaries verified - tmux: $TMUX_BIN, irssi: $IRSSI_BIN"
-
-# 1. Check for existing session
-if $TMUX_BIN -S "$TMUX_SOCKET" has-session -t "$TMUX_SESSION" 2>/dev/null; then
-    log_msg "Attaching to existing session: $TMUX_SESSION"
-    exec $TMUX_BIN -S "$TMUX_SOCKET" attach-session -t "$TMUX_SESSION"
+# Check for existing session
+if $TMUX_BIN -S "$TMUX_SOCKET" -f "$TMUX_CONF" has-session -t "$TMUX_SESSION" 2>/dev/null; then
+    log_msg "Attaching to existing session"
+    exec $TMUX_BIN -u -S "$TMUX_SOCKET" -f "$TMUX_CONF" attach-session -t "$TMUX_SESSION"
 else
-    log_msg "Creating new detached session: $TMUX_SESSION"
-
-    # 2. Create the session DETACHED (-d) first. 
-    # We pass 'bash' as the command so we have a reliable shell environment.
-    $TMUX_BIN -S "$TMUX_SOCKET" -f "$TMUX_CONF" new-session -d -s "$TMUX_SESSION" -c "$userDir" /bin/bash
-
-    # 3. Send the complex loop as a literal string to the session.
-    # This avoids the nested quoting issues in the 'new-session' line.
-    $TMUX_BIN -S "$TMUX_SOCKET" send-keys -t "$TMUX_SESSION" "
-        log_msg() { echo \"[\$(date '+%Y-%m-%d %H:%M:%S')] \$1\" >> \"$logFile\"; };
-        while true; do
-            log_msg 'Starting irssi';
-            $IRSSI_BIN --home='$userDir' --nick='$username';
-            EXIT_CODE=\$?;
-            log_msg \"irssi exited with code \$EXIT_CODE\";
-            echo 'irssi exited. Restarting in 2 seconds...';
-            sleep 2;
-        done
-    " C-m
-
-    # 4. Now attach to the session we just prepared.
-    log_msg "Setup complete. Attaching..."
-    exec $TMUX_BIN -S "$TMUX_SOCKET" attach-session -t "$TMUX_SESSION"
+    log_msg "Creating new session"
+    exec $TMUX_BIN -u -S "$TMUX_SOCKET" -f "$TMUX_CONF" new-session -s "$TMUX_SESSION" \\
+        "export LANG=en_US.UTF-8; \\
+         export LC_ALL=en_US.UTF-8; \\
+         export LC_CTYPE=en_US.UTF-8; \\
+         while true; do \\
+            $IRSSI_BIN --home='${userDir}' --nick='${username}' \\
+                --connect='${config.irc.server}:${config.irc.port}'; \\
+            sleep 2; \\
+         done"
 fi
-        `, { mode: 0o755 });
+    `, { mode: 0o755 });
 
-        console.log(`Created startup script: ${startupScript}`);
+    console.log(`Created startup script: ${startupScript}`);
 
-        return startupScript;
-    }
-
+    return startupScript;
+}
     getOrCreateSession(username) {
         let session = this.activeSessions.get(username);
 
