@@ -48,7 +48,7 @@ services:
       start_period: 10s
 
   traefik:
-    image: traefik:v3.0-alpine
+    image: traefik:v3.6.8
     container_name: traefik-prod
     restart: always
     

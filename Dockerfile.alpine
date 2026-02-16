@@ -1,4 +1,4 @@
-# Dockerfile (Lightweight Alpine - Node 24)
+# Dockerfile.alpine (With UTF-8 Support for ä, ö, å)
 
 # Stage 1: Build stage
 FROM node:24-alpine AS builder
@@ -8,7 +8,7 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies (including dev dependencies for building native modules)
+# Install dependencies
 RUN apk add --no-cache --virtual .build-deps \
     python3 \
     make \
@@ -19,21 +19,32 @@ RUN apk add --no-cache --virtual .build-deps \
 # Stage 2: Runtime stage
 FROM node:24-alpine
 
-# Install runtime dependencies only
+# Install runtime dependencies + locale support
 RUN apk add --no-cache \
     irssi \
     tmux \
     sqlite \
     bash \
+    shadow \
+    musl-locales \
+    musl-locales-lang \
     && rm -rf /var/cache/apk/*
 
+# Set UTF-8 locale environment variables
+ENV LANG=en_US.UTF-8 \
+    LC_ALL=en_US.UTF-8 \
+    LANGUAGE=en_US:en
+
+# Remove git user if exists
+RUN deluser git 2>/dev/null || true
+
 # Create non-root user
-RUN adduser -D -h /app -s /bin/bash webircuser
+RUN adduser -D -u 1000 -h /app -s /bin/bash webircuser
 
 WORKDIR /app
 
 # Copy node_modules from builder
-COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder --chown=webircuser:webircuser /app/node_modules ./node_modules
 
 # Copy application
 COPY --chown=webircuser:webircuser . .
@@ -48,7 +59,7 @@ USER webircuser
 # Expose port
 EXPOSE 3001
 
-# Health check (lightweight)
+# Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
     CMD wget -q --spider http://localhost:3001 || exit 1
 
