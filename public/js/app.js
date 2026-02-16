@@ -37,17 +37,6 @@ const app = {
         } else {
             console.log('No saved session, waiting for login');
         }
-        // Event listeners (replacing inline onclick)
-        document.getElementById('btn-refresh')?.addEventListener('click', () => this.forceRefresh());
-        document.getElementById('btn-reconnect')?.addEventListener('click', () => this.reconnect());
-        document.getElementById('btn-reset')?.addEventListener('click', () => this.clearSession());
-        document.getElementById('btn-logout')?.addEventListener('click', () => this.logout());
-        document.getElementById('admin-link')?.addEventListener('click', () => AdminUI.show());
-        document.getElementById('btn-mobile-send')?.addEventListener('click', () => this.sendMobileInput());
-
-        document.getElementById('mobile-input')?.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') this.sendMobileInput();
-        });
     
         // Setup event listeners
         this.setupEventListeners();
@@ -65,33 +54,43 @@ const app = {
     },
 
     setupEventListeners() {
-
-       
-        // Handle page visibility changes
-        document.addEventListener('visibilitychange', () => {
-            if (!document.hidden && TerminalManager.ws && TerminalManager.ws.readyState === WebSocket.OPEN) {
-                setTimeout(() => TerminalManager.forceRefresh(), 200);
-            }
-        });
-
-        // Prevent accidental close
-        window.addEventListener('beforeunload', (e) => {
-            if (TerminalManager.ws && TerminalManager.ws.readyState === WebSocket.OPEN) {
-                e.preventDefault();
-                e.returnValue = '';
-            }
-        });
-
-        // Admin link click
+ 
+        // Status bar buttons
+        const btnRefresh = document.getElementById('btn-refresh');
+        const btnReconnect = document.getElementById('btn-reconnect');
+        const btnReset = document.getElementById('btn-reset');
+        const btnLogout = document.getElementById('btn-logout');
         const adminLink = document.getElementById('admin-link');
-        if (adminLink) {
-            adminLink.addEventListener('click', () => {
-                AdminUI.show();
-            });
+        
+        // Mobile keyboard
+        const btnMobileSend = document.getElementById('btn-mobile-send');
+        const mobileInput = document.getElementById('mobile-input');
+
+        // Attach event listeners
+        if (btnRefresh) {
+            btnRefresh.addEventListener('click', () => this.forceRefresh());
+        }
+        
+        if (btnReconnect) {
+            btnReconnect.addEventListener('click', () => this.reconnect());
+        }
+        
+        if (btnReset) {
+            btnReset.addEventListener('click', () => this.clearSession());
+        }
+        
+        if (btnLogout) {
+            btnLogout.addEventListener('click', () => this.logout());
         }
 
-        // Mobile input
-        const mobileInput = document.getElementById('mobile-input');
+        if (adminLink) {
+            adminLink.addEventListener('click', () => AdminUI.show());
+        }
+        
+        if (btnMobileSend) {
+            btnMobileSend.addEventListener('click', () => this.sendMobileInput());
+        }
+        
         if (mobileInput) {
             mobileInput.addEventListener('keypress', (e) => {
                 if (e.key === 'Enter') this.sendMobileInput();
